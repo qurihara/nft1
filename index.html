@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Polygon Amoy テストネット スマートコントラクト連携サンプル</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    button { margin: 5px; padding: 10px 20px; font-size: 16px; }
+    #output { margin-top: 20px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Polygon Amoy テストネット スマートコントラクト連携サンプル</h1>
+  <button id="readButton">読み取り専用メソッド呼び出し</button>
+  <button id="writeButton">状態更新メソッド呼び出し（Metamask）</button>
+  <div id="output"></div>
+
+  <!-- ethers.js の CDN を読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+  <script>
+    /*****************************************************
+     * 注意: このサンプルでは Alchemy の API キーを直接コードに記述しています。
+     * 本番環境では、Alchemy ダッシュボードの「Allowed Domains」等の機能を利用して、
+     * 利用可能なドメインを限定するなどの対策を必ず実施してください。
+     *****************************************************/
+
+    // --- 設定 ---
+    // Alchemy API キー（必ず利用可能なドメイン制限等の対策を実施してください）
+    const ALCHEMY_API_KEY = "YOUR_ALCHEMY_API_KEY_HERE";
+    // Polygon Amoy テストネットの RPC URL
+    const RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/" + ALCHEMY_API_KEY;
+
+    // スマートコントラクトのアドレスと ABI（必要に応じて実際のものに置換してください）
+    const CONTRACT_ADDRESS = "0xYourContractAddressHere";
+    const CONTRACT_ABI = [
+      // 読み取り専用メソッド（例: 値を取得する）
+      "function readOnlyMethod() view returns (uint256)",
+      // 状態更新メソッド（例: 値を更新する）
+      "function stateChangingMethod(uint256 newValue) external"
+    ];
+
+    // --- プロバイダーとコントラクトのインスタンス作成 ---
+    const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+    // 読み取り専用の場合はプロバイダーのみで十分
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+    // --- イベントリスナーの設定 ---
+    document.getElementById("readButton").addEventListener("click", async () => {
+      const output = document.getElementById("output");
+      output.textContent = "読み取り専用メソッドを呼び出しています...";
+      try {
+        // 読み取り専用メソッドの呼び出し
+        const result = await contract.readOnlyMethod();
+        output.textContent = "読み取り専用メソッドの結果:\n" + result.toString();
+      } catch (error) {
+        console.error(error);
+        output.textContent = "エラーが発生しました:\n" + error.message;
+      }
+    });
+
+    document.getElementById("writeButton").addEventListener("click", async () => {
+      const output = document.getElementById("output");
+
+      // Metamask (window.ethereum) の存在確認
+      if (typeof window.ethereum === "undefined") {
+        alert("Metamask が検出されません。インストールしてください。");
+        return;
+      }
+
+      output.textContent = "状態更新メソッドを呼び出しています...\nMetamask の操作を確認してください。";
+      try {
+        // Metamask からアカウントアクセスを要求
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        // signer（署名可能なプロバイダー）を取得
+        const signer = provider.getSigner();
+        // 状態更新メソッド呼び出しのため、コントラクトインスタンスに signer を接続
+        const contractWithSigner = contract.connect(signer);
+
+        // ユーザーから新しい値を入力してもらう（例として数値の入力）
+        let inputValue = prompt("状態更新メソッドに渡す新しい数値を入力してください:", "42");
+        if (inputValue === null) {
+          output.textContent = "キャンセルされました。";
+          return;
+        }
+        const newValue = parseInt(inputValue);
+        if (isNaN(newValue)) {
+          output.textContent = "入力値が無効です。数値を入力してください。";
+          return;
+        }
+
+        // 状態更新メソッドの呼び出し（トランザクション送信）
+        const tx = await contractWithSigner.stateChangingMethod(newValue);
+        output.textContent = "トランザクション送信済み:\n" + tx.hash + "\n確認中...";
+
+        // トランザクションの確認を待つ
+        const receipt = await tx.wait();
+        output.textContent += "\n\nトランザクションがブロック " + receipt.blockNumber + " で確認されました。";
+      } catch (error) {
+        console.error(error);
+        output.textContent = "エラーが発生しました:\n" + error.message;
+      }
+    });
+  </script>
+</body>
+</html>
