@@ -15,541 +15,315 @@
   <button id="writeButton">mint call</button>
   <div id="output"></div>
 
-  <!-- ethers.js の CDN を読み込み -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+  <!-- ethers.js の UMD ビルドを読み込む -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <script>
     /*****************************************************
-     * 注意: このサンプルでは Alchemy の API キーを直接コードに記述しています。
-     * 本番環境では、Alchemy ダッシュボードの「Allowed Domains」などの機能を利用して、
+     * 注意:
+     * このサンプルでは Alchemy の API キーを直接コード内に記述しています。
+     * 本番環境では、Alchemy ダッシュボードの「Allowed Domains」等を利用し、
      * 利用可能なドメインを限定するなどの対策を必ず実施してください。
      *****************************************************/
 
     // --- 設定 ---
-    // Alchemy API キー（必ず利用可能なドメイン制限等の対策を実施してください）
-    // const ALCHEMY_API_KEY = "YOUR_ALCHEMY_API_KEY_HERE";
-    const ALCHEMY_API_KEY = "QKAjvFhFCHEzWBpCWG49O8ao8zsw8878";//ドメイン制限済
-    // Polygon Amoy テストネットの RPC URL
+    const ALCHEMY_API_KEY = "QKAjvFhFCHEzWBpCWG49O8ao8zsw8878"; // ドメイン制限済
     const RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/" + ALCHEMY_API_KEY;
-
-    // スマートコントラクトのアドレスと ABI（必要に応じて実際のものに置換してください）
-    // const CONTRACT_ADDRESS = "0xYourContractAddressHere";
     const CONTRACT_ADDRESS = "0xBDC4Ba6C52BCb242D0fDdf9Ff52a30dd6C1B7063";
     const CONTRACT_ABI = [
-    {
-      "inputs": [],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "approved",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "Approval",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "operator",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "bool",
-          "name": "approved",
-          "type": "bool"
-        }
-      ],
-      "name": "ApprovalForAll",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "TimeElapsed",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "Transfer",
-      "type": "event"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "approve",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        }
-      ],
-      "name": "balanceOf",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getApproved",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "operator",
-          "type": "address"
-        }
-      ],
-      "name": "isApprovedForAll",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "isTimeElapsed",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "recipient",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "xMinutes",
-          "type": "uint256"
-        }
-      ],
-      "name": "mint",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "name",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "ownerOf",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "safeTransferFrom",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "data",
-          "type": "bytes"
-        }
-      ],
-      "name": "safeTransferFrom",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "operator",
-          "type": "address"
-        },
-        {
-          "internalType": "bool",
-          "name": "approved",
-          "type": "bool"
-        }
-      ],
-      "name": "setApprovalForAll",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes4",
-          "name": "interfaceId",
-          "type": "bytes4"
-        }
-      ],
-      "name": "supportsInterface",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "symbol",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "tokenInfo",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "mintTime",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "duration",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bool",
-          "name": "eventEmitted",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "tokenURI",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "transferFrom",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "triggerTimeElapsed",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    }
-  ]
-    
-    // [
-    //   // 読み取り専用関数: tokenId の経過時間が経過しているか確認する（戻り値は例として bool 型）
-    //   "function isTimeElapsed(uint256 tokenId) view returns (bool)",
-    //   // 状態変更関数: 指定されたアドレスへ xMinutes 分を引数として mint 処理を実行
-    //   "function mint(address to, uint256 xMinutes) external"
-    // ];
+      {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "approved", "type": "address" },
+          { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "Approval",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "operator", "type": "address" },
+          { "indexed": false, "internalType": "bool", "name": "approved", "type": "bool" }
+        ],
+        "name": "ApprovalForAll",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": false, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "TimeElapsed",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+          { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "Transfer",
+        "type": "event"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "to", "type": "address" },
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "approve",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "owner", "type": "address" }
+        ],
+        "name": "balanceOf",
+        "outputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "getApproved",
+        "outputs": [
+          { "internalType": "address", "name": "", "type": "address" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "owner", "type": "address" },
+          { "internalType": "address", "name": "operator", "type": "address" }
+        ],
+        "name": "isApprovedForAll",
+        "outputs": [
+          { "internalType": "bool", "name": "", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "isTimeElapsed",
+        "outputs": [
+          { "internalType": "bool", "name": "", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "recipient", "type": "address" },
+          { "internalType": "uint256", "name": "xMinutes", "type": "uint256" }
+        ],
+        "name": "mint",
+        "outputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "name",
+        "outputs": [
+          { "internalType": "string", "name": "", "type": "string" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "ownerOf",
+        "outputs": [
+          { "internalType": "address", "name": "", "type": "address" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "from", "type": "address" },
+          { "internalType": "address", "name": "to", "type": "address" },
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "safeTransferFrom",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "from", "type": "address" },
+          { "internalType": "address", "name": "to", "type": "address" },
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
+          { "internalType": "bytes", "name": "data", "type": "bytes" }
+        ],
+        "name": "safeTransferFrom",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "operator", "type": "address" },
+          { "internalType": "bool", "name": "approved", "type": "bool" }
+        ],
+        "name": "setApprovalForAll",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "bytes4", "name": "interfaceId", "type": "bytes4" }
+        ],
+        "name": "supportsInterface",
+        "outputs": [
+          { "internalType": "bool", "name": "", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "symbol",
+        "outputs": [
+          { "internalType": "string", "name": "", "type": "string" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "name": "tokenInfo",
+        "outputs": [
+          { "internalType": "uint256", "name": "mintTime", "type": "uint256" },
+          { "internalType": "uint256", "name": "duration", "type": "uint256" },
+          { "internalType": "bool", "name": "eventEmitted", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "tokenURI",
+        "outputs": [
+          { "internalType": "string", "name": "", "type": "string" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "from", "type": "address" },
+          { "internalType": "address", "name": "to", "type": "address" },
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "transferFrom",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "triggerTimeElapsed",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ];
 
     // --- プロバイダーとコントラクトのインスタンス作成 ---
+    // 読み取り専用の場合は、Alchemy の RPC URL を利用した JsonRpcProvider を使用
     const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-    // 読み取り専用の場合はプロバイダーのみで十分
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
     // --- 読み取り専用関数 isTimeElapsed(tokenId) の呼び出し ---
-    document.getElementById("readButton").addEventListener("click", async () => {
-      const output = document.getElementById("output");
-      // ユーザーに tokenId の入力を促す
-      let tokenIdInput = prompt("調べる tokenId を入力してください:");
+    document.getElementById("readButton").addEventListener("click", async function() {
+      var output = document.getElementById("output");
+      var tokenIdInput = prompt("Enter tokenId to check isTimeElapsed:");
       if (tokenIdInput === null) {
-        output.textContent = "キャンセルされました。";
+        output.textContent = "Operation cancelled.";
         return;
       }
-      const tokenId = parseInt(tokenIdInput);
+      var tokenId = parseInt(tokenIdInput);
       if (isNaN(tokenId)) {
-        output.textContent = "無効な tokenId です。";
+        output.textContent = "Invalid tokenId.";
         return;
       }
-      output.textContent = "isTimeElapsed を呼び出しています...";
+      output.textContent = "Calling isTimeElapsed...";
       try {
-        const result = await contract.isTimeElapsed(tokenId);
-        output.textContent = "tokenId " + tokenId + " の isTimeElapsed 結果: " + result;
+        var result = await contract.isTimeElapsed(tokenId);
+        output.textContent = "TokenId " + tokenId + " isTimeElapsed result: " + result;
       } catch (error) {
         console.error(error);
-        output.textContent = "エラーが発生しました:\n" + error.message;
+        output.textContent = "Error occurred:\n" + error.message;
       }
     });
 
     // --- 状態変更関数 mint(signer.address, xMinutes) の呼び出し ---
-    document.getElementById("writeButton").addEventListener("click", async () => {
-      const output = document.getElementById("output");
+    document.getElementById("writeButton").addEventListener("click", async function() {
+      var output = document.getElementById("output");
 
-      // Metamask (window.ethereum) の存在確認
       if (typeof window.ethereum === "undefined") {
-        alert("Metamask が検出されません。インストールしてください。");
+        alert("Metamask not detected. Please install Metamask.");
         return;
       }
 
-      output.textContent = "mint を呼び出しています...\nMetamask の操作を確認してください。";
+      output.textContent = "Calling mint...\nPlease confirm the transaction in Metamask.";
       try {
         // Metamask からアカウントアクセスを要求
         await window.ethereum.request({ method: "eth_requestAccounts" });
-        // signer（署名可能なプロバイダー）を取得
-        const signer = provider.getSigner();
-        // 状態変更関数呼び出しのため、コントラクトインスタンスに signer を接続
-        const contractWithSigner = contract.connect(signer);
+        // ethers v5 では Web3Provider を利用して signer を取得
+        var metamaskProvider = new ethers.providers.Web3Provider(window.ethereum);
+        var signer = metamaskProvider.getSigner();
+        var contractWithSigner = contract.connect(signer);
 
-        // ユーザーに xMinutes の値を入力してもらう
-        let xMinutesInput = prompt("mint のため、xMinutes の値を入力してください:");
+        var xMinutesInput = prompt("Enter xMinutes for mint:");
         if (xMinutesInput === null) {
-          output.textContent = "キャンセルされました。";
+          output.textContent = "Operation cancelled.";
           return;
         }
-        const xMinutes = parseInt(xMinutesInput);
+        var xMinutes = parseInt(xMinutesInput);
         if (isNaN(xMinutes)) {
-          output.textContent = "無効な xMinutes の値です。";
+          output.textContent = "Invalid xMinutes value.";
           return;
         }
 
-        // signer のアドレスを取得し、mint 関数の第一引数として利用
-        const signerAddress = await signer.getAddress();
-
-        // 状態変更関数 mint(signer.address, xMinutes) の呼び出し
-        const tx = await contractWithSigner.mint(signerAddress, xMinutes);
-        output.textContent = "トランザクション送信済み: " + tx.hash + "\n確認中...";
-
-        // トランザクションの確認を待つ
-        const receipt = await tx.wait();
-        output.textContent += "\nトランザクションがブロック " + receipt.blockNumber + " で確定しました。";
+        var signerAddress = await signer.getAddress();
+        var tx = await contractWithSigner.mint(signerAddress, xMinutes);
+        output.textContent = "Transaction sent: " + tx.hash + "\nWaiting for confirmation...";
+        var receipt = await tx.wait();
+        output.textContent += "\nTransaction confirmed in block " + receipt.blockNumber + ".";
       } catch (error) {
         console.error(error);
-        output.textContent = "エラーが発生しました:\n" + error.message;
+        output.textContent = "Error occurred:\n" + error.message;
       }
     });
   </script>
