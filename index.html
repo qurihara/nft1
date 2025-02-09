@@ -2,376 +2,302 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Polygon Amoy smartcontract test with Web3Modal</title>
+  <!-- レスポンシブデザイン用 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Polygon Amoy NFT Function Executor</title>
+  <!-- Google Fonts を利用 -->
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    button { margin: 5px; padding: 10px 20px; font-size: 16px; }
-    #output { margin-top: 20px; white-space: pre-wrap; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+      color: #333;
+    }
+    header {
+      background: #4a90e2;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+    }
+    main {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      margin-bottom: 20px;
+    }
+    .buttons button {
+      flex: 1 1 30%;
+      margin: 10px;
+      padding: 15px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      background: #4a90e2;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .buttons button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .buttons button:hover:not(:disabled) {
+      background: #357ab8;
+    }
+    #functionList {
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+    }
+    #functionList button {
+      flex: 1 1 45%;
+      margin: 5px;
+      padding: 10px;
+      font-size: 14px;
+      border: none;
+      border-radius: 5px;
+      background: #6c5ce7;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    #functionList button:hover:not(:disabled) {
+      background: #5941a9;
+    }
+    #output {
+      padding: 15px;
+      background: #e9ecef;
+      border-radius: 5px;
+      font-size: 14px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    @media (max-width: 600px) {
+      .buttons button, #functionList button {
+        flex: 1 1 100%;
+        margin: 5px 0;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Polygon Amoy smartcontract test with Web3Modal</h1>
-  <!-- ウォレット接続用のボタンを追加 -->
-  <button id="connectWalletButton">ウォレット接続</button>
-  <button id="readButton">isTimeElapsed call (read only)</button>
-  <button id="writeButton">mint call</button>
-  <div id="output"></div>
+  <header>
+    <h1>Polygon Amoy NFT Function Executor</h1>
+    <p>URL例: <code>?contract=0x1234...&tokenId=123</code></p>
+  </header>
+  <main>
+    <div class="buttons">
+      <!-- ウォレット接続用ボタン（状態変更関数実行時に必要） -->
+      <button id="connectWalletButton" disabled>ウォレット接続</button>
+    </div>
+    <div id="functionList">
+      <!-- ここにABIから動的に各関数ボタンが生成されます -->
+    </div>
+    <div id="output">NFTメタデータおよびABI読み込み中…</div>
+  </main>
 
-  <!-- ethers.js の UMD ビルド -->
+  <!-- ライブラリ -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-  <!-- WalletConnectProvider の UMD ビルド -->
   <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
-  <!-- Web3Modal の UMD ビルド -->
   <script src="https://unpkg.com/web3modal@1.9.5/dist/index.js"></script>
 
   <script>
     /*****************************************************
      * 注意:
-     * このサンプルでは Alchemy の API キーを直接コード内に記述しています。
-     * 本番環境では、Alchemy ダッシュボードの「Allowed Domains」等を利用し、
-     * 利用可能なドメインを限定するなどの対策を必ず実施してください。
+     * ・このサンプルでは Alchemy の API キーを直接記述しています。
+     * ・本番環境では、適切なセキュリティ対策（例：Allowed Domains の設定など）を必ず実施してください。
      *****************************************************/
 
-    // --- 設定 ---
-    const ALCHEMY_API_KEY = "QKAjvFhFCHEzWBpCWG49O8ao8zsw8878"; // ドメイン制限済
+    // GETパラメータ取得用ヘルパー関数
+    function getQueryParam(paramName) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(paramName);
+    }
+
+    // --- 基本設定 ---
+    const ALCHEMY_API_KEY = "QKAjvFhFCHEzWBpCWG49O8ao8zsw8878";
     const RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/" + ALCHEMY_API_KEY;
-    const CONTRACT_ADDRESS = "0xBDC4Ba6C52BCb242D0fDdf9Ff52a30dd6C1B7063";
-    const CONTRACT_ABI = [
-      {
-        "inputs": [],
-        "stateMutability": "nonpayable",
-        "type": "constructor"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
-          { "indexed": true, "internalType": "address", "name": "approved", "type": "address" },
-          { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "Approval",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
-          { "indexed": true, "internalType": "address", "name": "operator", "type": "address" },
-          { "indexed": false, "internalType": "bool", "name": "approved", "type": "bool" }
-        ],
-        "name": "ApprovalForAll",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          { "indexed": false, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "TimeElapsed",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
-          { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
-          { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "Transfer",
-        "type": "event"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "to", "type": "address" },
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "approve",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "owner", "type": "address" }
-        ],
-        "name": "balanceOf",
-        "outputs": [
-          { "internalType": "uint256", "name": "", "type": "uint256" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "getApproved",
-        "outputs": [
-          { "internalType": "address", "name": "", "type": "address" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "owner", "type": "address" },
-          { "internalType": "address", "name": "operator", "type": "address" }
-        ],
-        "name": "isApprovedForAll",
-        "outputs": [
-          { "internalType": "bool", "name": "", "type": "bool" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "isTimeElapsed",
-        "outputs": [
-          { "internalType": "bool", "name": "", "type": "bool" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "recipient", "type": "address" },
-          { "internalType": "uint256", "name": "xMinutes", "type": "uint256" }
-        ],
-        "name": "mint",
-        "outputs": [
-          { "internalType": "uint256", "name": "", "type": "uint256" }
-        ],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "name",
-        "outputs": [
-          { "internalType": "string", "name": "", "type": "string" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "ownerOf",
-        "outputs": [
-          { "internalType": "address", "name": "", "type": "address" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "from", "type": "address" },
-          { "internalType": "address", "name": "to", "type": "address" },
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "safeTransferFrom",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "from", "type": "address" },
-          { "internalType": "address", "name": "to", "type": "address" },
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-          { "internalType": "bytes", "name": "data", "type": "bytes" }
-        ],
-        "name": "safeTransferFrom",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "operator", "type": "address" },
-          { "internalType": "bool", "name": "approved", "type": "bool" }
-        ],
-        "name": "setApprovalForAll",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "bytes4", "name": "interfaceId", "type": "bytes4" }
-        ],
-        "name": "supportsInterface",
-        "outputs": [
-          { "internalType": "bool", "name": "", "type": "bool" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "symbol",
-        "outputs": [
-          { "internalType": "string", "name": "", "type": "string" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "uint256", "name": "", "type": "uint256" }
-        ],
-        "name": "tokenInfo",
-        "outputs": [
-          { "internalType": "uint256", "name": "mintTime", "type": "uint256" },
-          { "internalType": "uint256", "name": "duration", "type": "uint256" },
-          { "internalType": "bool", "name": "eventEmitted", "type": "bool" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "tokenURI",
-        "outputs": [
-          { "internalType": "string", "name": "", "type": "string" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "address", "name": "from", "type": "address" },
-          { "internalType": "address", "name": "to", "type": "address" },
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "transferFrom",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "triggerTimeElapsed",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      }
+    const defaultContractAddress = "0xBDC4Ba6C52BCb242D0fDdf9Ff52a30dd6C1B7063";
+    // GETで"contract"パラメーターが指定されていればその値を、なければデフォルト値を使用
+    const CONTRACT_ADDRESS = getQueryParam("contract") || defaultContractAddress;
+    const tokenIdParam = getQueryParam("tokenId");
+    // ABI_URL は NFT メタデータ内の animation_url から動的に取得するためここでは初期値なし
+    let ABI_URL = null;
+
+    const outputDiv = document.getElementById("output");
+
+    // --- Minimal NFT ABI (tokenURI のみ) ---
+    const minimalNFTABI = [
+      "function tokenURI(uint256 tokenId) view returns (string)"
     ];
+    const readProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
+    const nftContract = new ethers.Contract(CONTRACT_ADDRESS, minimalNFTABI, readProvider);
 
-    // --- Web3Modal のセットアップ ---
+    // --- グローバル変数（ABIおよび動的コントラクト用） ---
+    let contractABI = null;
+    let contract = null;
+
+    // --- Web3Modal 関連 ---
     let web3Modal;
-    let provider;    // Web3Modal により接続されたプロバイダー
-    let signer;      // 接続されたウォレットの signer
+    let provider;    // Web3Modal 接続プロバイダー
+    let signer;      // 接続ウォレットの signer
     let walletConnected = false;
-    let connection;  // 接続オブジェクト
+    let connection;
 
-    // WalletConnect をプロバイダーオプションとして設定
     const providerOptions = {
       walletconnect: {
-        package: window.WalletConnectProvider.default, // UMD 版では default プロパティ経由
+        package: window.WalletConnectProvider.default,
         options: {
-          rpc: {
-            // Polygon Amoy Testnet の chainId は 80002（Alchmey の RPC URL を指定）
-            80002: RPC_URL
-          }
+          rpc: { 80002: RPC_URL }
         }
       }
     };
-
-    // Web3Modal の初期化（ページ読み込み時）
     window.addEventListener('load', async () => {
       web3Modal = new window.Web3Modal.default({
-        cacheProvider: false, // 自動接続しない
+        cacheProvider: false,
         providerOptions
       });
+      document.getElementById("connectWalletButton").disabled = false;
     });
 
-    // 読み取り専用プロバイダーとして、Alchemy の RPC URL を利用
-    const readProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
-    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, readProvider);
-
-    // ウォレット接続用の関数（Web3Modal を利用）
     async function connectWallet() {
       try {
         connection = await web3Modal.connect();
         provider = new ethers.providers.Web3Provider(connection);
         signer = provider.getSigner();
         walletConnected = true;
-        document.getElementById("output").textContent = "ウォレット接続成功。\nアドレス: " + await signer.getAddress();
+        const addr = await signer.getAddress();
+        outputDiv.textContent += "\nウォレット接続成功: " + addr;
       } catch (error) {
         console.error("ウォレット接続失敗", error);
-        document.getElementById("output").textContent = "ウォレット接続失敗:\n" + error.message;
+        outputDiv.textContent += "\nウォレット接続失敗: " + error.message;
       }
     }
-
     document.getElementById("connectWalletButton").addEventListener("click", connectWallet);
 
-    // --- 読み取り専用関数 isTimeElapsed(tokenId) の呼び出し ---
-    document.getElementById("readButton").addEventListener("click", async function() {
-      var output = document.getElementById("output");
-      var tokenIdInput = prompt("Enter tokenId to check isTimeElapsed:");
-      if (tokenIdInput === null) {
-        output.textContent = "Operation cancelled.";
+    // --- NFTメタデータおよびABI読み込みのメイン処理 ---
+    async function loadNFTMetadataAndABI() {
+      if (!tokenIdParam) {
+        outputDiv.textContent = "tokenIdがURLのパラメーターに指定されていません。例: ?tokenId=123";
         return;
       }
-      var tokenId = parseInt(tokenIdInput);
-      if (isNaN(tokenId)) {
-        output.textContent = "Invalid tokenId.";
-        return;
-      }
-      output.textContent = "Calling isTimeElapsed...";
       try {
-        var result = await contract.isTimeElapsed(tokenId);
-        output.textContent = "TokenId " + tokenId + " isTimeElapsed result: " + result;
+        outputDiv.textContent = "tokenURI取得中…";
+        let tokenURI = await nftContract.tokenURI(tokenIdParam);
+        // IPFS形式の場合の変換
+        if (tokenURI.startsWith("ipfs://")) {
+          tokenURI = tokenURI.replace("ipfs://", "https://ipfs.io/ipfs/");
+        }
+        outputDiv.textContent += "\nTokenURI: " + tokenURI;
+        // NFTメタデータの取得
+        const metaResponse = await fetch(tokenURI);
+        if (!metaResponse.ok) {
+          throw new Error("メタデータ取得エラー: " + metaResponse.status);
+        }
+        const metadata = await metaResponse.json();
+        outputDiv.textContent += "\nNFTメタデータ取得完了.";
+        // NFTメタデータから animation_url を抽出し、ABI_URL とする
+        if (!metadata.animation_url) {
+          throw new Error("animation_url がメタデータに存在しません。");
+        }
+        ABI_URL = metadata.animation_url;
+        outputDiv.textContent += "\nanimation_url (ABI URL): " + ABI_URL;
+        // ABI の取得
+        outputDiv.textContent += "\nABI取得中…";
+        const abiResponse = await fetch(ABI_URL);
+        if (!abiResponse.ok) {
+          throw new Error("ABI取得エラー: " + abiResponse.status);
+        }
+        contractABI = await abiResponse.json();
+        outputDiv.textContent += "\nABI取得完了。";
+        // コントラクトインスタンスの生成（読み取り用）
+        contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, readProvider);
+        // 動的にABIから全ての関数ボタンを生成
+        buildFunctionButtons();
       } catch (error) {
-        console.error(error);
-        output.textContent = "Error occurred:\n" + error.message;
+        console.error("エラー:", error);
+        outputDiv.textContent += "\nエラー発生: " + error.message;
       }
-    });
+    }
+    loadNFTMetadataAndABI();
 
-    // --- 状態変更関数 mint(signer.address, xMinutes) の呼び出し ---
-    document.getElementById("writeButton").addEventListener("click", async function() {
-      var output = document.getElementById("output");
+    // --- 動的にABIから各関数のボタンを生成する ---
+    function buildFunctionButtons() {
+      const container = document.getElementById("functionList");
+      container.innerHTML = "";  // 初期化
+      contractABI.forEach((item) => {
+        if (item.type === "function") {
+          let label = item.name + "(";
+          if (item.inputs && item.inputs.length > 0) {
+            label += item.inputs.map(inp => inp.type).join(", ");
+          }
+          label += ")";
+          const btn = document.createElement("button");
+          btn.textContent = label;
+          btn.addEventListener("click", async () => {
+            await callFunction(item);
+          });
+          container.appendChild(btn);
+        }
+      });
+    }
 
-      if (!walletConnected) {
-        alert("ウォレットが接続されていません。先にウォレット接続してください。");
-        return;
+    // --- 共通の関数呼び出し処理 ---
+    async function callFunction(funcABI) {
+      let args = [];
+      if (funcABI.inputs && funcABI.inputs.length > 0) {
+        for (let i = 0; i < funcABI.inputs.length; i++) {
+          const inp = funcABI.inputs[i];
+          const val = prompt(`パラメーター ${i+1} (${inp.name || inp.type}) を入力してください:`);
+          if (val === null) {
+            outputDiv.textContent += "\n操作キャンセル";
+            return;
+          }
+          // ※ 必要に応じて型変換を行ってください
+          args.push(val);
+        }
       }
-
-      output.textContent = "Calling mint...\nPlease confirm the transaction in your wallet.";
-      try {
-        // 接続済みの signer を利用してコントラクトに接続
-        const contractWithSigner = contract.connect(signer);
-
-        var xMinutesInput = prompt("Enter xMinutes for mint:");
-        if (xMinutesInput === null) {
-          output.textContent = "Operation cancelled.";
+      // 読み取り専用の場合
+      if (funcABI.stateMutability === "view" || funcABI.stateMutability === "pure") {
+        outputDiv.textContent += `\n${funcABI.name} 呼び出し中…`;
+        try {
+          const result = await contract[funcABI.name](...args);
+          outputDiv.textContent += `\n結果: ` + JSON.stringify(result, null, 2);
+        } catch (error) {
+          console.error(error);
+          outputDiv.textContent += `\nエラー: ${error.message}`;
+        }
+      } else {
+        // 状態変更の場合：ウォレット接続が必要
+        if (!walletConnected) {
+          alert("ウォレットが接続されていません。先にウォレット接続してください。");
           return;
         }
-        var xMinutes = parseInt(xMinutesInput);
-        if (isNaN(xMinutes)) {
-          output.textContent = "Invalid xMinutes value.";
-          return;
+        outputDiv.textContent += `\n${funcABI.name} 呼び出し中…\nウォレットでトランザクションを確認してください。`;
+        try {
+          const contractWithSigner = contract.connect(signer);
+          const tx = await contractWithSigner[funcABI.name](...args);
+          outputDiv.textContent += `\nトランザクション送信済み: ${tx.hash}\n確認中…`;
+          const receipt = await tx.wait();
+          outputDiv.textContent += `\nブロック ${receipt.blockNumber} で確定。`;
+        } catch (error) {
+          console.error(error);
+          outputDiv.textContent += `\nエラー: ${error.message}`;
         }
-
-        var signerAddress = await signer.getAddress();
-        var tx = await contractWithSigner.mint(signerAddress, xMinutes);
-        output.textContent = "Transaction sent: " + tx.hash + "\nWaiting for confirmation...";
-        var receipt = await tx.wait();
-        output.textContent += "\nTransaction confirmed in block " + receipt.blockNumber + ".";
-      } catch (error) {
-        console.error(error);
-        output.textContent = "Error occurred:\n" + error.message;
       }
-    });
+    }
   </script>
 </body>
 </html>
