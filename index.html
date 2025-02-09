@@ -120,7 +120,7 @@
      * ・本番環境では、適切なセキュリティ対策（例：Allowed Domains の設定など）を必ず実施してください。
      *****************************************************/
 
-    // GETパラメータ取得用ヘルパー関数
+    // GETパラメーター取得用ヘルパー関数
     function getQueryParam(paramName) {
       const urlParams = new URLSearchParams(window.location.search);
       return urlParams.get(paramName);
@@ -130,15 +130,15 @@
     const ALCHEMY_API_KEY = "QKAjvFhFCHEzWBpCWG49O8ao8zsw8878";
     const RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/" + ALCHEMY_API_KEY;
     const defaultContractAddress = "0xBDC4Ba6C52BCb242D0fDdf9Ff52a30dd6C1B7063";
-    // GETで"contract"パラメーターが指定されていればその値を、なければデフォルト値を使用
+    // GETで"contract"パラメーターが指定されていればその値、なければデフォルト
     const CONTRACT_ADDRESS = getQueryParam("contract") || defaultContractAddress;
     const tokenIdParam = getQueryParam("tokenId");
-    // ABI_URL は NFT メタデータ内の animation_url から動的に取得するためここでは初期値なし
+    // ABI_URL は、NFTメタデータ内の animation_url から取得するため、初期値は null
     let ABI_URL = null;
 
     const outputDiv = document.getElementById("output");
 
-    // --- Minimal NFT ABI (tokenURI のみ) ---
+    // --- Minimal NFT ABI (tokenURIのみ) ---
     const minimalNFTABI = [
       "function tokenURI(uint256 tokenId) view returns (string)"
     ];
@@ -151,8 +151,8 @@
 
     // --- Web3Modal 関連 ---
     let web3Modal;
-    let provider;    // Web3Modal 接続プロバイダー
-    let signer;      // 接続ウォレットの signer
+    let provider;    // Web3Modal接続プロバイダー
+    let signer;      // ウォレットの署名者
     let walletConnected = false;
     let connection;
 
@@ -164,6 +164,7 @@
         }
       }
     };
+
     window.addEventListener('load', async () => {
       web3Modal = new window.Web3Modal.default({
         cacheProvider: false,
@@ -190,7 +191,7 @@
     // --- NFTメタデータおよびABI読み込みのメイン処理 ---
     async function loadNFTMetadataAndABI() {
       if (!tokenIdParam) {
-        outputDiv.textContent = "tokenIdがURLのパラメーターに指定されていません。例: ?tokenId=123";
+        outputDiv.textContent = "tokenIdがURLパラメーターに指定されていません。例: ?tokenId=123";
         return;
       }
       try {
@@ -207,14 +208,28 @@
           throw new Error("メタデータ取得エラー: " + metaResponse.status);
         }
         const metadata = await metaResponse.json();
-        outputDiv.textContent += "\nNFTメタデータ取得完了.";
+        
+        // ここでメタデータの内容を表示する
+        outputDiv.textContent += "\n\nNFTメタデータ取得完了:\n" + JSON.stringify(metadata, null, 2);
+        if (metadata.image) {
+          let imageUrl = metadata.image;
+          if (imageUrl.startsWith("ipfs://")) {
+            imageUrl = imageUrl.replace("ipfs://", "https://ipfs.io/ipfs/");
+          }
+          const img = document.createElement("img");
+          img.src = imageUrl;
+          img.alt = metadata.name || "NFT Image";
+          outputDiv.appendChild(document.createElement("hr"));
+          outputDiv.appendChild(img);
+        }
+        
         // NFTメタデータから animation_url を抽出し、ABI_URL とする
         if (!metadata.animation_url) {
           throw new Error("animation_url がメタデータに存在しません。");
         }
         ABI_URL = metadata.animation_url;
         outputDiv.textContent += "\nanimation_url (ABI URL): " + ABI_URL;
-        // ABI の取得
+        // ABIの取得
         outputDiv.textContent += "\nABI取得中…";
         const abiResponse = await fetch(ABI_URL);
         if (!abiResponse.ok) {
@@ -236,7 +251,7 @@
     // --- 動的にABIから各関数のボタンを生成する ---
     function buildFunctionButtons() {
       const container = document.getElementById("functionList");
-      container.innerHTML = "";  // 初期化
+      container.innerHTML = "";
       contractABI.forEach((item) => {
         if (item.type === "function") {
           let label = item.name + "(";
@@ -254,7 +269,7 @@
       });
     }
 
-    // --- 共通の関数呼び出し処理 ---
+    // --- 関数呼び出し用共通処理 ---
     async function callFunction(funcABI) {
       let args = [];
       if (funcABI.inputs && funcABI.inputs.length > 0) {
@@ -265,7 +280,6 @@
             outputDiv.textContent += "\n操作キャンセル";
             return;
           }
-          // ※ 必要に応じて型変換を行ってください
           args.push(val);
         }
       }
