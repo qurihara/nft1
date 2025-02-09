@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Polygon Amoy smartcontract test</title>
+  <title>Polygon Amoy smartcontract test with Web3Modal</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     button { margin: 5px; padding: 10px 20px; font-size: 16px; }
@@ -10,13 +10,20 @@
   </style>
 </head>
 <body>
-  <h1>Polygon Amoy smartcontract test</h1>
+  <h1>Polygon Amoy smartcontract test with Web3Modal</h1>
+  <!-- ウォレット接続用のボタンを追加 -->
+  <button id="connectWalletButton">ウォレット接続</button>
   <button id="readButton">isTimeElapsed call (read only)</button>
   <button id="writeButton">mint call</button>
   <div id="output"></div>
 
-  <!-- ethers.js の UMD ビルドを読み込む -->
+  <!-- ethers.js の UMD ビルド -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <!-- WalletConnectProvider の UMD ビルド -->
+  <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <!-- Web3Modal の UMD ビルド -->
+  <script src="https://unpkg.com/web3modal@1.9.5/dist/index.js"></script>
+
   <script>
     /*****************************************************
      * 注意:
@@ -259,10 +266,53 @@
       }
     ];
 
-    // --- プロバイダーとコントラクトのインスタンス作成 ---
-    // 読み取り専用の場合は、Alchemy の RPC URL を利用した JsonRpcProvider を使用
-    const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+    // --- Web3Modal のセットアップ ---
+    let web3Modal;
+    let provider;    // Web3Modal により接続されたプロバイダー
+    let signer;      // 接続されたウォレットの signer
+    let walletConnected = false;
+    let connection;  // 接続オブジェクト
+
+    // WalletConnect をプロバイダーオプションとして設定
+    const providerOptions = {
+      walletconnect: {
+        package: window.WalletConnectProvider.default, // UMD 版では default プロパティ経由
+        options: {
+          rpc: {
+            // Polygon Amoy Testnet の chainId は 80002（Alchmey の RPC URL を指定）
+            80002: RPC_URL
+          }
+        }
+      }
+    };
+
+    // Web3Modal の初期化（ページ読み込み時）
+    window.addEventListener('load', async () => {
+      web3Modal = new window.Web3Modal.default({
+        cacheProvider: false, // 自動接続しない
+        providerOptions
+      });
+    });
+
+    // 読み取り専用プロバイダーとして、Alchemy の RPC URL を利用
+    const readProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, readProvider);
+
+    // ウォレット接続用の関数（Web3Modal を利用）
+    async function connectWallet() {
+      try {
+        connection = await web3Modal.connect();
+        provider = new ethers.providers.Web3Provider(connection);
+        signer = provider.getSigner();
+        walletConnected = true;
+        document.getElementById("output").textContent = "ウォレット接続成功。\nアドレス: " + await signer.getAddress();
+      } catch (error) {
+        console.error("ウォレット接続失敗", error);
+        document.getElementById("output").textContent = "ウォレット接続失敗:\n" + error.message;
+      }
+    }
+
+    document.getElementById("connectWalletButton").addEventListener("click", connectWallet);
 
     // --- 読み取り専用関数 isTimeElapsed(tokenId) の呼び出し ---
     document.getElementById("readButton").addEventListener("click", async function() {
@@ -291,19 +341,15 @@
     document.getElementById("writeButton").addEventListener("click", async function() {
       var output = document.getElementById("output");
 
-      if (typeof window.ethereum === "undefined") {
-        alert("Metamask not detected. Please install Metamask.");
+      if (!walletConnected) {
+        alert("ウォレットが接続されていません。先にウォレット接続してください。");
         return;
       }
 
-      output.textContent = "Calling mint...\nPlease confirm the transaction in Metamask.";
+      output.textContent = "Calling mint...\nPlease confirm the transaction in your wallet.";
       try {
-        // Metamask からアカウントアクセスを要求
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        // ethers v5 では Web3Provider を利用して signer を取得
-        var metamaskProvider = new ethers.providers.Web3Provider(window.ethereum);
-        var signer = metamaskProvider.getSigner();
-        var contractWithSigner = contract.connect(signer);
+        // 接続済みの signer を利用してコントラクトに接続
+        const contractWithSigner = contract.connect(signer);
 
         var xMinutesInput = prompt("Enter xMinutes for mint:");
         if (xMinutesInput === null) {
