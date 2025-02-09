@@ -83,6 +83,21 @@
       font-size: 14px;
       white-space: pre-wrap;
       word-wrap: break-word;
+      margin-bottom: 20px;
+    }
+    #metadataDisplay {
+      padding: 15px;
+      background: #dfe6e9;
+      border-radius: 5px;
+      font-size: 14px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin-bottom: 20px;
+    }
+    img {
+      max-width: 100%;
+      border-radius: 5px;
+      margin-top: 10px;
     }
     @media (max-width: 600px) {
       .buttons button, #functionList button {
@@ -105,7 +120,8 @@
     <div id="functionList">
       <!-- ここにABIから動的に各関数ボタンが生成されます -->
     </div>
-    <div id="output">NFTメタデータおよびABI読み込み中…</div>
+    <div id="output">ログ・ABI読み込み状態がここに表示されます…</div>
+    <div id="metadataDisplay">NFTメタデータがここに表示されます…</div>
   </main>
 
   <!-- ライブラリ -->
@@ -133,10 +149,11 @@
     // GETで"contract"パラメーターが指定されていればその値、なければデフォルト
     const CONTRACT_ADDRESS = getQueryParam("contract") || defaultContractAddress;
     const tokenIdParam = getQueryParam("tokenId");
-    // ABI_URL は、NFTメタデータ内の animation_url から取得するため、初期値は null
+    // ABI_URLは、NFTメタデータ内のanimation_urlから動的に取得するため初期値はnull
     let ABI_URL = null;
 
     const outputDiv = document.getElementById("output");
+    const metadataDiv = document.getElementById("metadataDisplay");
 
     // --- Minimal NFT ABI (tokenURIのみ) ---
     const minimalNFTABI = [
@@ -151,8 +168,8 @@
 
     // --- Web3Modal 関連 ---
     let web3Modal;
-    let provider;    // Web3Modal接続プロバイダー
-    let signer;      // ウォレットの署名者
+    let provider;    // Web3Modalで接続されたプロバイダー
+    let signer;      // 接続されたウォレットの signer
     let walletConnected = false;
     let connection;
 
@@ -208,9 +225,10 @@
           throw new Error("メタデータ取得エラー: " + metaResponse.status);
         }
         const metadata = await metaResponse.json();
-        
-        // ここでメタデータの内容を表示する
-        outputDiv.textContent += "\n\nNFTメタデータ取得完了:\n" + JSON.stringify(metadata, null, 2);
+
+        // NFTメタデータの内容をmetadataDivに表示（JSON形式で整形）
+        metadataDiv.textContent = "NFTメタデータ取得完了:\n" + JSON.stringify(metadata, null, 2);
+        // imageフィールドが存在する場合、画像を表示
         if (metadata.image) {
           let imageUrl = metadata.image;
           if (imageUrl.startsWith("ipfs://")) {
@@ -219,10 +237,10 @@
           const img = document.createElement("img");
           img.src = imageUrl;
           img.alt = metadata.name || "NFT Image";
-          outputDiv.appendChild(document.createElement("hr"));
-          outputDiv.appendChild(img);
+          metadataDiv.appendChild(document.createElement("hr"));
+          metadataDiv.appendChild(img);
         }
-        
+
         // NFTメタデータから animation_url を抽出し、ABI_URL とする
         if (!metadata.animation_url) {
           throw new Error("animation_url がメタデータに存在しません。");
