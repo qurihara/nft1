@@ -116,6 +116,7 @@
     <div class="buttons">
       <!-- ウォレット接続用ボタン（状態変更関数実行時に必要） -->
       <button id="connectWalletButton" disabled>ウォレット接続</button>
+      <button id="writeButton" disabled>mint me</button>
     </div>
     <div id="functionList">
       <!-- ここにABIから動的に各関数ボタンが生成されます -->
@@ -330,6 +331,40 @@
         }
       }
     }
+
+    document.getElementById("writeButton").addEventListener("click", async function() {
+      const output = document.getElementById("output");
+      if (!walletConnected) {
+        alert("ウォレットが接続されていません。先にウォレット接続してください。");
+        return;
+      }
+      if (!contract) {
+        output.textContent = "ABIがまだ読み込まれていません。";
+        return;
+      }
+      output.textContent = "mint を呼び出し中...\nウォレットでトランザクションを確認してください。";
+      try {
+        const contractWithSigner = contract.connect(signer);
+        const xMinutesInput = prompt("mint用の xMinutes の値を入力してください:");
+        if (xMinutesInput === null) {
+          output.textContent = "操作をキャンセルしました。";
+          return;
+        }
+        const xMinutes = parseInt(xMinutesInput);
+        if (isNaN(xMinutes)) {
+          output.textContent = "無効な xMinutes の値です。";
+          return;
+        }
+        const signerAddress = await signer.getAddress();
+        const tx = await contractWithSigner.mint(signerAddress, xMinutes);
+        output.textContent = "トランザクション送信済み: " + tx.hash + "\n確認中...";
+        const receipt = await tx.wait();
+        output.textContent += "\nブロック " + receipt.blockNumber + " で確定。";
+      } catch (error) {
+        console.error(error);
+        output.textContent = "エラー発生: " + error.message;
+      }
+    });
   </script>
 </body>
 </html>
